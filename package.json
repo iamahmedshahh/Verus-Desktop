@@ -54,6 +54,7 @@
     "axios": "1.16.0",
     "base64url": "git+https://github.com/VerusCoin/base64url.git",
     "bigi": "1.4.2",
+    "bip39": "git+https://github.com/VerusCoin/bip39.git#17d3bbefc80d243903eabd60e0ed64f20aa2bf31",
     "bitgo-utxo-lib": "git+https://github.com/VerusCoin/bitgo-utxo-lib.git",
     "blake2b": "git+https://github.com/VerusCoin/blake2b.git#777f844b986173d08fc27fe9547c6f6320a82d62",
     "body-parser": "1.19.1",
