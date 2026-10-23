@@ -69,7 +69,7 @@ export default (api: any) => {
       throw new Error('Seed details must contain 32 bytes of BIP39 entropy.');
     }
 
-    const keys = api.seedToWif(entropyToMnemonic(entropy), 'vrsctest', true);
+    const keys = api.seedToWif(entropyToMnemonic(entropy), 'vrsc', true);
 
     return {address: keys.pub};
   };
