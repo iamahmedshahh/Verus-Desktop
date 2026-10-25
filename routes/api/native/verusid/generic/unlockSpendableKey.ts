@@ -26,14 +26,11 @@ const saltedDecrypt = async (password: string, blob: Buffer, iters: number): Pro
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]);
 };
 
-export default (api: any) => {
-  api.native.verusid.generic.unlock_spendable_key = async (
-    request: GenericRequest,
-    detailIndex: number,
-    password?: string
-  ): Promise<{address: string}> => {
-    const detail = request.details[detailIndex];
 
+export const spendableKeyDetailsOrdinalToMnemonic = async (
+  detail: unknown,
+  password?: string
+): Promise<string> => {
     if (
       !(detail instanceof SpendableKeyDetailsOrdinalVDXFObject) ||
       !detail.data.isValid() ||
@@ -69,7 +66,17 @@ export default (api: any) => {
       throw new Error('Seed details must contain 32 bytes of BIP39 entropy.');
     }
 
-    const keys = api.seedToWif(entropyToMnemonic(entropy), 'vrsc', true);
+    return entropyToMnemonic(entropy);
+  };
+  
+  export default (api: any) => {
+  api.native.verusid.generic.unlock_spendable_key = async (
+    request: GenericRequest,
+    detailIndex: number,
+    password?: string
+  ): Promise<{address: string}> => {
+    const mnemonic = await spendableKeyDetailsOrdinalToMnemonic(request.details[detailIndex], password);
+    const keys = api.seedToWif(mnemonic, 'vrsc', true);
 
     return {address: keys.pub};
   };

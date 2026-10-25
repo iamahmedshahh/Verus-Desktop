@@ -87,6 +87,7 @@
     "verus-wallet-endpoints": "git+https://github.com/VerusCoin/verus-wallet-endpoints.git",
     "verus_bridgekeeper": "git+https://github.com/VerusCoin/verusbridgekeeper.git#860dbe862780947bafb0b0c23b6f75c923bc9484",
     "verusd-rpc-ts-client": "git+https://github.com/VerusCoin/verusd-rpc-ts-client.git",
+    "verusid-ts-client": "git+https://github.com/VerusCoin/verusid-ts-client.git#933e8f8da1a51b99ba7533701dddb9914b7a06b7",
     "wif": "2.0.6"
   },
   "devDependencies": {

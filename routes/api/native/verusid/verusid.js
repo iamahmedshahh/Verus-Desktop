@@ -23,6 +23,7 @@ module.exports = api => {
   require('./generic/encryptAppEncryptionResponse').default(api);
   require('./generic/unlockSpendableKey').default(api);
   require('./generic/discoverSpendableKeyClaims').default(api);
+  require('./generic/claimSpendableKey').default(api);
 
   return api;
 };

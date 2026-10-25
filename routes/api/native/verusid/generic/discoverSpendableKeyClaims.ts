@@ -17,7 +17,7 @@ const {ROOT_SYSTEM_ID, ROOT_SYSTEM_NAME} = require('../../../utils/constants/dev
 
 // Ported from Verus Mobile's src/utils/spendableKey/spendableKey.js, keeping its function names.
 
-const SPENDABLE_KEY_CLAIM_FEE_SATS = 10000n;
+export const SPENDABLE_KEY_CLAIM_FEE_SATS = 10000n;
 const SPENDABLE_KEY_CLAIM_NON_NATIVE_FEE_SATS = 20000n;
 const SPENDABLE_KEY_CLAIM_IDENTITY_SWEEP_FEE_SATS = 20000n;
 const SATS = BigInt(SATOSHIS);
@@ -44,7 +44,7 @@ interface IdentityDefinition {
   friendlyname?: string;
 }
 
-interface IdentityResult extends IdentityDefinition {
+export interface IdentityResult extends IdentityDefinition {
   identity?: IdentityDefinition;
   status?: string;
   blockheight?: number;
@@ -88,7 +88,7 @@ class GetIdentitiesWithAddressRequest extends ApiRequest {
   }
 }
 
-const utxoKey = (utxo: AddressUtxo): string => `${utxo.txid}:${utxo.outputIndex}`;
+export const utxoKey = (utxo: AddressUtxo): string => `${utxo.txid}:${utxo.outputIndex}`;
 
 const getCurrencyValueSats = (value: number | string): bigint =>
   BigInt(Number(value).toFixed(8).replace('.', ''));
@@ -133,7 +133,7 @@ const isTransferUtxo = (systemId: string, utxo: AddressUtxo): boolean => {
 const isSpendableUtxo = (systemId: string, utxo: AddressUtxo): boolean =>
   (utxo.isspendable === true || utxo.isspendable === 1) && isTransferUtxo(systemId, utxo);
 
-const getUtxoNativeSatoshis = (systemId: string, utxo: AddressUtxo): bigint => {
+export const getUtxoNativeSatoshis = (systemId: string, utxo: AddressUtxo): bigint => {
   const nativeSats = BigInt(utxo.satoshis || 0);
 
   if (nativeSats > 0n) return nativeSats;
@@ -154,10 +154,10 @@ const hasPositiveNonNativeCurrencyValue = (
 const isNativeUtxo = (systemId: string) => (utxo: AddressUtxo) =>
   isTransferUtxo(systemId, utxo) && getUtxoNativeSatoshis(systemId, utxo) > 0n;
 
-const isPureNativeUtxo = (systemId: string) => (utxo: AddressUtxo) =>
+export const isPureNativeUtxo = (systemId: string) => (utxo: AddressUtxo) =>
   isNativeUtxo(systemId)(utxo) && !hasPositiveNonNativeCurrencyValue(systemId, utxo.currencyvalues);
 
-const sumUtxoBalances = (systemId: string, utxos: AddressUtxo[]): Map<string, bigint> => {
+export const sumUtxoBalances = (systemId: string, utxos: AddressUtxo[]): Map<string, bigint> => {
   const balances = new Map<string, bigint>();
 
   for (const utxo of utxos) {
@@ -178,7 +178,7 @@ const sumUtxoBalances = (systemId: string, utxos: AddressUtxo[]): Map<string, bi
   return balances;
 };
 
-const selectUtxosForAmount = (
+export const selectUtxosForAmount = (
   utxos: AddressUtxo[],
   amountSats: bigint,
   getUtxoSats: GetUtxoSats = utxo => BigInt(utxo.satoshis || 0)
@@ -198,7 +198,7 @@ const selectUtxosForAmount = (
   return null;
 };
 
-const removeUtxos = (utxos: AddressUtxo[], used: AddressUtxo[]): AddressUtxo[] => {
+export const removeUtxos = (utxos: AddressUtxo[], used: AddressUtxo[]): AddressUtxo[] => {
   const usedKeys = new Set(used.map(utxoKey));
   return utxos.filter(utxo => !usedKeys.has(utxoKey(utxo)));
 };
@@ -209,7 +209,7 @@ const addBalanceMap = (target: Map<string, bigint>, source: Map<string, bigint>)
   }
 };
 
-const subtractBalanceMap = (
+export const subtractBalanceMap = (
   target: Map<string, bigint>,
   currencyId: string,
   sats: bigint
@@ -218,10 +218,10 @@ const subtractBalanceMap = (
   target.set(currencyId, nextSats > 0n ? nextSats : 0n);
 };
 
-const getNativeBalance = (systemId: string, utxos: AddressUtxo[]): bigint =>
+export const getNativeBalance = (systemId: string, utxos: AddressUtxo[]): bigint =>
   sumUtxoBalances(systemId, utxos).get(systemId) ?? 0n;
 
-const hasNonNativeBalance = (systemId: string, utxos: AddressUtxo[]): boolean =>
+export const hasNonNativeBalance = (systemId: string, utxos: AddressUtxo[]): boolean =>
   Array.from(sumUtxoBalances(systemId, utxos).entries()).some(
     ([currencyId, sats]) => currencyId !== systemId && sats > 0n
   );
@@ -229,13 +229,13 @@ const hasNonNativeBalance = (systemId: string, utxos: AddressUtxo[]): boolean =>
 const hasPositiveBalance = (systemId: string, utxos: AddressUtxo[]): boolean =>
   Array.from(sumUtxoBalances(systemId, utxos).values()).some(sats => sats > 0n);
 
-const getSweepClaimFee = (hasNonNative: boolean, includesIdentityUpdate = false): bigint => {
+export const getSweepClaimFee = (hasNonNative: boolean, includesIdentityUpdate = false): bigint => {
   if (includesIdentityUpdate) return SPENDABLE_KEY_CLAIM_IDENTITY_SWEEP_FEE_SATS;
 
   return hasNonNative ? SPENDABLE_KEY_CLAIM_NON_NATIVE_FEE_SATS : SPENDABLE_KEY_CLAIM_FEE_SATS;
 };
 
-const getIdentityFeeUtxos = (
+export const getIdentityFeeUtxos = (
   systemId: string,
   identity: IdentityClaim,
   feeSats: bigint,
@@ -247,7 +247,7 @@ const getIdentityFeeUtxos = (
     utxo => getUtxoNativeSatoshis(systemId, utxo)
   );
 
-const shouldCombineIdentityWithSweep = (
+export const shouldCombineIdentityWithSweep = (
   systemId: string,
   availableUtxos: AddressUtxo[],
   identity: IdentityClaim,
