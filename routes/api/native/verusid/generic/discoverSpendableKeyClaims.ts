@@ -492,14 +492,20 @@ const mergeIdentityClaims = (...identityLists: IdentityClaim[][]): IdentityClaim
   return Array.from(byAddress.values());
 };
 
+// getidentitieswithaddress needs -idindex=1, which Desktop doesn't start the daemon with, so only
+// this lookup falls back to the public API. It only learns the card's address.
 const getIdentitiesWithPrimaryAddress = async (
   rpc: VerusdRpcInterface,
+  identityLookupRpc: VerusdRpcInterface,
   systemId: string,
   address: string
 ): Promise<IdentityResult[]> => {
-  const res = await rpc.request<IdentityResult[]>(
-    new GetIdentitiesWithAddressRequest(systemId, {address, unspent: true})
-  );
+  const request = new GetIdentitiesWithAddressRequest(systemId, {address, unspent: true});
+  let res = await rpc.request<IdentityResult[]>(request);
+
+  if (res.error?.message.includes('-idindex')) {
+    res = await identityLookupRpc.request<IdentityResult[]>(request);
+  }
 
   if (res.error) throw new Error(res.error.message);
 
@@ -547,7 +553,8 @@ export const discoverSpendableKeyClaims = async (
   rpc: VerusdRpcInterface,
   systemId: string,
   systemName: string,
-  claimAddress: string
+  claimAddress: string,
+  identityLookupRpc: VerusdRpcInterface = rpc
 ): Promise<{utxos: AddressUtxo[]; currencies: CurrencyClaim[]; identities: IdentityClaim[]}> => {
   const utxosRes = await rpc.getAddressUtxos({addresses: [claimAddress], friendlynames: true});
 
@@ -569,7 +576,7 @@ export const discoverSpendableKeyClaims = async (
       await enrichIdentityResults(
         rpc,
         systemName,
-        await getIdentitiesWithPrimaryAddress(rpc, systemId, claimAddress)
+        await getIdentitiesWithPrimaryAddress(rpc, identityLookupRpc, systemId, claimAddress)
       ),
       claimAddress,
       systemId
@@ -611,6 +618,10 @@ export const discoverSpendableKeyClaims = async (
 
   return {utxos: spendableUtxos, currencies, identities};
 };
+export const getSpendableKeyRpcs = (api: any) => ({
+  rpc: api.native.getRpcInterface(ROOT_SYSTEM_NAME, ROOT_SYSTEM_ID) as VerusdRpcInterface,
+  identityLookupRpc: new VerusdRpcInterface(ROOT_SYSTEM_ID, VRPC_ENDPOINTS[ROOT_SYSTEM_NAME]),
+});
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default (api: any) => {
@@ -624,12 +635,13 @@ export default (api: any) => {
       );
     }
 
-    const rpc = new VerusdRpcInterface(ROOT_SYSTEM_ID, VRPC_ENDPOINTS[ROOT_SYSTEM_NAME]);
+    const {rpc, identityLookupRpc} = getSpendableKeyRpcs(api);
     const {currencies, identities} = await discoverSpendableKeyClaims(
       rpc,
       ROOT_SYSTEM_ID,
       ROOT_SYSTEM_NAME,
-      address
+      address,
+      identityLookupRpc
     );
 
     return {

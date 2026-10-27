@@ -4,13 +4,12 @@ import {I_ADDR_VERSION, R_ADDR_VERSION} from 'verus-typescript-primitives/dist/c
 import {VerusdRpcInterface} from 'verusd-rpc-ts-client';
 import {primitives, VerusIdInterface} from 'verusid-ts-client';
 
-import {VRPC_ENDPOINTS} from '../../../utils/constants/urls';
-
 import {
   AddressUtxo,
   discoverSpendableKeyClaims,
   getIdentityFeeUtxos,
   getNativeBalance,
+  getSpendableKeyRpcs,
   getSweepClaimFee,
   getUtxoNativeSatoshis,
   hasNonNativeBalance,
@@ -871,14 +870,15 @@ export default (api: any) => {
     );
     // VRSC and VRSCTEST use the same address versions.
     const keys = api.seedToWif(mnemonic, 'vrsc', true);
-    // Same public API as the scan, like Mobile's VrpcProvider endpoint and VerusIdInterface.
-    const rpc = new VerusdRpcInterface(ROOT_SYSTEM_ID, VRPC_ENDPOINTS[ROOT_SYSTEM_NAME]);
-    const verusId = new VerusIdInterface(ROOT_SYSTEM_ID, VRPC_ENDPOINTS[ROOT_SYSTEM_NAME]);
+    //  scan through the daemon
+    const {rpc, identityLookupRpc} = getSpendableKeyRpcs(api);
+    const verusId = new VerusIdInterface(ROOT_SYSTEM_ID, '', undefined, rpc.rpcRequestOverride);
     const {utxos, identities} = await discoverSpendableKeyClaims(
       rpc,
       ROOT_SYSTEM_ID,
       ROOT_SYSTEM_NAME,
-      keys.pub
+      keys.pub,
+      identityLookupRpc
     );
     const transactions = await preflightSpendableKeyClaim({
       rpc,
