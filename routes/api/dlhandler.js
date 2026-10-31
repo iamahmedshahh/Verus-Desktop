@@ -61,5 +61,36 @@ module.exports = api => {
     return deeplinkHandler(urlstring);
   };
 
+  // Redeeming your own gift card is claiming its link, like opening it from outside the app.
+  api.setPost(
+    '/native/verusid/giftcard/redeem_spendable_key',
+    async (req, res) => {
+      const {chainTicker, uri} = req.body;
+
+      try {
+        if (chainTicker !== ROOT_SYSTEM_NAME) {
+          throw new Error(
+            `This spendable key is for ${chainTicker}, but Verus Desktop is using ${ROOT_SYSTEM_NAME}.`
+          );
+        }
+
+        res.send(
+          JSON.stringify({
+            msg: 'success',
+            result: await api.dlhandler(uri),
+          })
+        );
+      } catch (e) {
+        res.send(
+          JSON.stringify({
+            msg: 'error',
+            result: e.message,
+          })
+        );
+      }
+    },
+    true
+  );
+
   return api;
 };

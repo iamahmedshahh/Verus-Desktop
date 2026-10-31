@@ -167,6 +167,12 @@ export = (api: any) => {
         true,
         async (data: DeeplinkResponse) => {
           try {
+            // Closing the window completes the request without any data.
+            if (data == null) {
+              reject(new Error('The request window was closed.'));
+              return;
+            }
+
             if ('error' in data) {
               reject(new Error(data.error));
               return;

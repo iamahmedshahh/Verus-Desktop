@@ -4,6 +4,7 @@ module.exports = api => {
   api.native.verusid.provision = {};
   api.native.verusid.identity = {};
   api.native.verusid.generic = {};
+  api.native.verusid.giftcard = {};
 
   // Identity
   require('./identity/executeIdentityUpdateRequest')(api);
@@ -24,6 +25,7 @@ module.exports = api => {
   require('./generic/unlockSpendableKey').default(api);
   require('./generic/discoverSpendableKeyClaims').default(api);
   require('./generic/claimSpendableKey').default(api);
+  require('./generic/fundSpendableKey').default(api);
 
   return api;
 };

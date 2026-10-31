@@ -18,8 +18,8 @@ const {ROOT_SYSTEM_ID, ROOT_SYSTEM_NAME} = require('../../../utils/constants/dev
 // Ported from Verus Mobile's src/utils/spendableKey/spendableKey.js, keeping its function names.
 
 export const SPENDABLE_KEY_CLAIM_FEE_SATS = 10000n;
-const SPENDABLE_KEY_CLAIM_NON_NATIVE_FEE_SATS = 20000n;
-const SPENDABLE_KEY_CLAIM_IDENTITY_SWEEP_FEE_SATS = 20000n;
+export const SPENDABLE_KEY_CLAIM_NON_NATIVE_FEE_SATS = 20000n;
+export const SPENDABLE_KEY_CLAIM_IDENTITY_SWEEP_FEE_SATS = 20000n;
 const SATS = BigInt(SATOSHIS);
 
 export interface AddressUtxo {
@@ -67,6 +67,26 @@ export interface CurrencyClaim {
   satoshis: bigint;
 }
 
+interface AddressDelta {
+  satoshis: number;
+  txid: string;
+  index: number;
+  blockindex: number;
+  height: number;
+  spending?: boolean;
+  blocktime?: number;
+  currencyvalues?: Record<string, number>;
+  sent?: {outputs: Array<{addresses: string | string[]}>};
+}
+
+export interface GiftCardClaimInfo {
+  txid: string;
+  height: number;
+  claimedAt: number | null;
+  claimedByAddresses: string[];
+  identities: string[];
+}
+
 type GetUtxoSats = (utxo: AddressUtxo) => bigint;
 
 // Desktop's pinned verusd-rpc-ts-client has no getIdentitiesWithAddress yet, so this is the same
@@ -90,7 +110,7 @@ class GetIdentitiesWithAddressRequest extends ApiRequest {
 
 export const utxoKey = (utxo: AddressUtxo): string => `${utxo.txid}:${utxo.outputIndex}`;
 
-const getCurrencyValueSats = (value: number | string): bigint =>
+export const getCurrencyValueSats = (value: number | string): bigint =>
   BigInt(Number(value).toFixed(8).replace('.', ''));
 
 export const satsToCoins = (sats: bigint): string =>
@@ -130,7 +150,7 @@ const isTransferUtxo = (systemId: string, utxo: AddressUtxo): boolean => {
   }
 };
 
-const isSpendableUtxo = (systemId: string, utxo: AddressUtxo): boolean =>
+export const isSpendableUtxo = (systemId: string, utxo: AddressUtxo): boolean =>
   (utxo.isspendable === true || utxo.isspendable === 1) && isTransferUtxo(systemId, utxo);
 
 export const getUtxoNativeSatoshis = (systemId: string, utxo: AddressUtxo): bigint => {
@@ -529,7 +549,7 @@ const getIdentityTransferUtxos = async (
   );
 };
 
-const getCurrencyDisplay = async (
+export const getCurrencyDisplay = async (
   rpc: VerusdRpcInterface,
   systemName: string,
   currencyId: string
@@ -554,8 +574,15 @@ export const discoverSpendableKeyClaims = async (
   systemId: string,
   systemName: string,
   claimAddress: string,
-  identityLookupRpc: VerusdRpcInterface = rpc
-): Promise<{utxos: AddressUtxo[]; currencies: CurrencyClaim[]; identities: IdentityClaim[]}> => {
+  identityLookupRpc: VerusdRpcInterface = rpc,
+  subtractDisplayFees = true,
+  expectedIdentities: string[] = []
+): Promise<{
+  utxos: AddressUtxo[];
+  currencies: CurrencyClaim[];
+  identities: IdentityClaim[];
+  identityLookupError: string | null;
+}> => {
   const utxosRes = await rpc.getAddressUtxos({addresses: [claimAddress], friendlynames: true});
 
   if (utxosRes.error) throw new Error(utxosRes.error.message);
@@ -570,6 +597,7 @@ export const discoverSpendableKeyClaims = async (
     claimAddress
   );
   let identitiesFromRpc: IdentityClaim[] = [];
+  let identityLookupError: string | null = null;
 
   try {
     identitiesFromRpc = getClaimableIdentities(
@@ -582,19 +610,38 @@ export const discoverSpendableKeyClaims = async (
       systemId
     );
   } catch (e) {
-    console.warn(e instanceof Error ? e.message : e);
+    identityLookupError = e instanceof Error ? e.message : String(e);
+    console.warn(identityLookupError);
+  }
+
+  const identitiesFromExpected: IdentityClaim[] = [];
+
+  for (const identityAddress of expectedIdentities) {
+    try {
+      const identityRes = await rpc.getIdentity(identityAddress);
+
+      if (identityRes.error) throw new Error(identityRes.error.message);
+
+      identitiesFromExpected.push(
+        ...getClaimableIdentities([identityRes.result as IdentityResult], claimAddress, systemId)
+      );
+    } catch (e) {
+      console.warn(e instanceof Error ? e.message : e);
+    }
   }
 
   const identities = await Promise.all(
-    mergeIdentityClaims(identitiesFromUtxos, identitiesFromRpc).map(async identity => ({
-      ...identity,
-      utxos: await getIdentityTransferUtxos(
-        rpc,
-        systemId,
-        identity.identityAddress,
-        spendableUtxos
-      ),
-    }))
+    mergeIdentityClaims(identitiesFromUtxos, identitiesFromRpc, identitiesFromExpected).map(
+      async identity => ({
+        ...identity,
+        utxos: await getIdentityTransferUtxos(
+          rpc,
+          systemId,
+          identity.identityAddress,
+          spendableUtxos
+        ),
+      })
+    )
   );
   const balanceMap = sumUtxoBalances(systemId, spendableUtxos);
 
@@ -602,7 +649,13 @@ export const discoverSpendableKeyClaims = async (
     addBalanceMap(balanceMap, sumUtxoBalances(systemId, identity.utxos));
   }
 
-  subtractBalanceMap(balanceMap, systemId, getDisplayFeeSats(systemId, spendableUtxos, identities));
+  if (subtractDisplayFees) {
+    subtractBalanceMap(
+      balanceMap,
+      systemId,
+      getDisplayFeeSats(systemId, spendableUtxos, identities)
+    );
+  }
 
   const currencies: CurrencyClaim[] = [];
 
@@ -616,7 +669,119 @@ export const discoverSpendableKeyClaims = async (
     });
   }
 
-  return {utxos: spendableUtxos, currencies, identities};
+  return {utxos: spendableUtxos, currencies, identities, identityLookupError};
+};
+
+const getDeltaTime = (delta: AddressDelta): number | null =>
+  delta.blocktime ? delta.blocktime * 1000 : null;
+
+const isClaimDelta = (delta: AddressDelta): boolean =>
+  delta.satoshis < 0 || Object.values(delta.currencyvalues ?? {}).some(value => Number(value) < 0);
+
+const compareClaimDeltas = (a: AddressDelta, b: AddressDelta): number =>
+  (getDeltaTime(a) ?? 0) - (getDeltaTime(b) ?? 0) ||
+  a.height - b.height ||
+  a.blockindex - b.blockindex ||
+  a.index - b.index;
+
+const getClaimedByAddresses = (delta: AddressDelta, claimAddress: string): string[] => [
+  ...new Set(
+    (delta.sent?.outputs ?? [])
+      .flatMap(output => (Array.isArray(output.addresses) ? output.addresses : [output.addresses]))
+      .filter(address => address && address !== claimAddress)
+  ),
+];
+
+const getBlockClaimTime = async (
+  rpc: VerusdRpcInterface,
+  height?: number
+): Promise<number | null> => {
+  if (!height) return null;
+
+  const blockRes = await rpc.getBlock(String(height));
+
+  if (blockRes.error || typeof blockRes.result === 'string') return null;
+
+  return blockRes.result.time ? blockRes.result.time * 1000 : null;
+};
+
+// Mobile's discoverGiftCardIdentityRedemptions: an ID that was on the card and now has other
+// primary addresses was claimed. A VerusID moving leaves nothing at the card's address.
+const discoverGiftCardIdentityRedemptions = async (
+  rpc: VerusdRpcInterface,
+  claimAddress: string,
+  expectedIdentities: string[],
+  identities: IdentityClaim[]
+): Promise<GiftCardClaimInfo[]> => {
+  const redemptions: GiftCardClaimInfo[] = [];
+
+  for (const identityAddress of expectedIdentities) {
+    if (identities.some(identity => identity.identityAddress === identityAddress)) continue;
+
+    try {
+      const identityRes = await rpc.getIdentity(identityAddress);
+
+      if (identityRes.error) throw new Error(identityRes.error.message);
+
+      const result = identityRes.result as IdentityResult;
+      const claimedByAddresses = (getIdentityFromResult(result).primaryaddresses ?? []).filter(
+        address => address !== claimAddress
+      );
+
+      if (claimedByAddresses.length === 0) continue;
+
+      redemptions.push({
+        txid: result.txid ?? '',
+        height: Number(result.blockheight ?? 0),
+        claimedAt: await getBlockClaimTime(rpc, result.blockheight),
+        claimedByAddresses,
+        identities: [identityAddress],
+      });
+    } catch (e) {
+      console.warn(e instanceof Error ? e.message : e);
+    }
+  }
+
+  return redemptions;
+};
+
+// Mobile's getGiftCardClaimInfo: the latest claim and everyone who claimed. A claim's outputs also
+// list the moved IDs themselves, so those are left out.
+export const getGiftCardClaimInfo = (
+  deltas: AddressDelta[],
+  claimAddress: string,
+  identityClaims: GiftCardClaimInfo[] = []
+): GiftCardClaimInfo | null => {
+  const claimDelta = deltas.filter(isClaimDelta).sort(compareClaimDeltas).pop();
+  const claims = [...identityClaims];
+
+  if (claimDelta != null) {
+    claims.push({
+      txid: claimDelta.txid,
+      height: claimDelta.height,
+      claimedAt: getDeltaTime(claimDelta),
+      claimedByAddresses: getClaimedByAddresses(claimDelta, claimAddress),
+      identities: [],
+    });
+  }
+
+  if (claims.length === 0) return null;
+
+  const identities = claims.flatMap(claim => claim.identities);
+  const latest = claims.reduce((a, b) =>
+    (b.claimedAt ?? 0) > (a.claimedAt ?? 0) ||
+    ((b.claimedAt ?? 0) === (a.claimedAt ?? 0) && b.height > a.height)
+      ? b
+      : a
+  );
+
+  return {
+    ...latest,
+    claimedByAddresses: [...new Set(claims.flatMap(claim => claim.claimedByAddresses))].filter(
+      address => !identities.includes(address)
+    ),
+    identities,
+  };
 };
 export const getSpendableKeyRpcs = (api: any) => ({
   rpc: api.native.getRpcInterface(ROOT_SYSTEM_NAME, ROOT_SYSTEM_ID) as VerusdRpcInterface,
@@ -627,7 +792,9 @@ export const getSpendableKeyRpcs = (api: any) => ({
 export default (api: any) => {
   api.native.verusid.generic.discover_spendable_key_claims = async (
     chainTicker: string,
-    address: string
+    address: string,
+    subtractDisplayFees = true,
+    expectedIdentities: string[] = []
   ) => {
     if (chainTicker !== ROOT_SYSTEM_NAME) {
       throw new Error(
@@ -636,13 +803,39 @@ export default (api: any) => {
     }
 
     const {rpc, identityLookupRpc} = getSpendableKeyRpcs(api);
-    const {currencies, identities} = await discoverSpendableKeyClaims(
+    const {currencies, identities, identityLookupError} = await discoverSpendableKeyClaims(
       rpc,
       ROOT_SYSTEM_ID,
       ROOT_SYSTEM_NAME,
       address,
-      identityLookupRpc
+      identityLookupRpc,
+      subtractDisplayFees,
+      expectedIdentities
     );
+    const deltasRes = await rpc.getAddressDeltas({
+      addresses: [address],
+      friendlynames: true,
+      verbosity: 1,
+    });
+
+    if (deltasRes.error) throw new Error(deltasRes.error.message);
+
+    const mempoolRes = await rpc.getAddressMempool({addresses: [address]});
+
+    if (mempoolRes.error) throw new Error(mempoolRes.error.message);
+
+    const deltas = (deltasRes.result ?? []) as AddressDelta[];
+    const identityClaims = await discoverGiftCardIdentityRedemptions(
+      rpc,
+      address,
+      expectedIdentities,
+      identities
+    );
+    // Mobile: a card that once received something and now holds nothing has been redeemed.
+    const redeemed =
+      currencies.length === 0 &&
+      identities.length === 0 &&
+      (deltas.length > 0 || identityClaims.length > 0);
 
     return {
       currencies: currencies.map(({currencyId, name, satoshis}) => ({
@@ -655,6 +848,10 @@ export default (api: any) => {
         fullyQualifiedName,
         unsupportedReason,
       })),
+      redeemed,
+      claimInfo: redeemed ? getGiftCardClaimInfo(deltas, address, identityClaims) : null,
+      identityLookupError,
+      hasMempoolTransactions: (mempoolRes.result ?? []).length > 0,
     };
   };
 
@@ -662,12 +859,14 @@ export default (api: any) => {
     '/native/verusid/generic/discover_spendable_key_claims',
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     async (req: any, res: any) => {
-      const {chainTicker, address} = req.body;
+      const {chainTicker, address, subtractDisplayFees, expectedIdentities} = req.body;
 
       try {
         const result = await api.native.verusid.generic.discover_spendable_key_claims(
           chainTicker,
-          address
+          address,
+          subtractDisplayFees,
+          Array.isArray(expectedIdentities) ? expectedIdentities : []
         );
 
         res.send(

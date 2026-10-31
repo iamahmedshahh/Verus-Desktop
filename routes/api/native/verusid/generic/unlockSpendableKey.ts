@@ -1,8 +1,11 @@
-import {createDecipheriv, pbkdf2} from 'crypto';
+import {createCipheriv, createDecipheriv, pbkdf2, randomBytes} from 'crypto';
 import {promisify} from 'util';
 
 import {entropyToMnemonic} from 'bip39';
-import {GenericRequest, SpendableKeyDetailsOrdinalVDXFObject} from 'verus-typescript-primitives';
+import {
+  GenericRequest,
+  SpendableKeyDetailsOrdinalVDXFObject,
+} from 'verus-typescript-primitives';
 
 const SALT_LEN = 16;
 const IV_LEN = 12;
@@ -12,6 +15,17 @@ const ENTROPY_LEN = 32;
 const MAX_KDF_ITERS = 1000000;
 
 const pbkdf2Async = promisify(pbkdf2);
+const randomBytesAsync = promisify(randomBytes);
+
+// Same format as Verus Mobile's saltedEncrypt: salt | iv | ciphertext | tag.
+export const saltedEncrypt = async (password: string, data: Buffer, iters: number): Promise<Buffer> => {
+  const salt = await randomBytesAsync(SALT_LEN);
+  const iv = await randomBytesAsync(IV_LEN);
+  const key = await pbkdf2Async(Buffer.from(password, 'utf8'), salt, iters, KEY_LEN, 'sha256');
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
+
+  return Buffer.concat([salt, iv, cipher.update(data), cipher.final(), cipher.getAuthTag()]);
+};
 
 const saltedDecrypt = async (password: string, blob: Buffer, iters: number): Promise<Buffer> => {
   const salt = blob.subarray(0, SALT_LEN);
@@ -68,8 +82,7 @@ export const spendableKeyDetailsOrdinalToMnemonic = async (
 
     return entropyToMnemonic(entropy);
   };
-  
-  export default (api: any) => {
+export default (api: any) => {
   api.native.verusid.generic.unlock_spendable_key = async (
     request: GenericRequest,
     detailIndex: number,
