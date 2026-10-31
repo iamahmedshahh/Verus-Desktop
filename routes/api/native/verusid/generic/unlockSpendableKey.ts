@@ -11,8 +11,8 @@ const SALT_LEN = 16;
 const IV_LEN = 12;
 const TAG_LEN = 16;
 const KEY_LEN = 32;
-const ENTROPY_LEN = 32;
-const MAX_KDF_ITERS = 1000000;
+export const ENTROPY_LEN = 32;
+export const MAX_KDF_ITERS = 1000000;
 
 const pbkdf2Async = promisify(pbkdf2);
 const randomBytesAsync = promisify(randomBytes);
