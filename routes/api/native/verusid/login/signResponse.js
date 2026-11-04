@@ -5,14 +5,12 @@ const {
 } = require("verus-typescript-primitives");
 
 module.exports = (api) => {
-  api.native.verusid.login.sign_response = async (response) => {
+  api.native.verusid.login.sign_response = async (coin, response) => {
     const loginResponse = new LoginConsentResponse(response);
-    const chainTicker = response.chainTicker
-    // Add the chainTicker when checking the request since the verify request needs it.
-    let decisionRequest = loginResponse.decision.request
-    decisionRequest.chainTicker = chainTicker
+    const decisionRequest = loginResponse.decision.request
 
     const verificatonCheck = await api.native.verusid.login.verify_request(
+      coin,
       decisionRequest
     );
 
@@ -20,7 +18,7 @@ module.exports = (api) => {
       throw new Error(verificatonCheck.message);
     }
 
-    const signdataResult = await api.native.sign_data(chainTicker,
+    const signdataResult = await api.native.sign_data(coin,
       {
         "address": loginResponse.signing_id,
         "datahash": loginResponse.decision.toSha256().toString("hex")
@@ -32,14 +30,11 @@ module.exports = (api) => {
       LOGIN_CONSENT_RESPONSE_SIG_VDXF_KEY
     );
 
-    // Remove the chainTicker field since it's not normally part of the response.
-    delete decisionRequest.chainTicker
-
     return { response: loginResponse};
   };
 
   api.setPost("/native/verusid/login/sign_response", async (req, res, next) => {
-    const { response } = req.body;
+    const { chainTicker, response } = req.body;
     let pendingClaim = null;
 
     try {
@@ -52,7 +47,7 @@ module.exports = (api) => {
         }
         pendingClaim = api.loginConsentUi.beginPendingResponse(response);
       }
-      const signedResponse = await api.native.verusid.login.sign_response(response);
+      const signedResponse = await api.native.verusid.login.sign_response(chainTicker, response);
       if (pendingClaim != null) pendingClaim.consume();
       res.send(
         JSON.stringify({

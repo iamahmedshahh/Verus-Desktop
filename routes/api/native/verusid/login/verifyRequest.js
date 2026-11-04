@@ -5,12 +5,11 @@ module.exports = (api) => {
    * Verifies a login request
    * @param {LoginConsentRequest} Request
    */
-  api.native.verusid.login.verify_request = async (request) => {
+  api.native.verusid.login.verify_request = async (coin, request) => {
     const loginConsentRequest = new LoginConsentRequest(request);
-    const chainTicker = request.chainTicker
 
     const verified = await api.native.verify_hash(
-      chainTicker,
+      coin,
       loginConsentRequest.signing_id,
       loginConsentRequest.challenge.toSha256().toString('hex'),
       loginConsentRequest.signature.signature
@@ -20,7 +19,7 @@ module.exports = (api) => {
   };
 
   api.setPost("/native/verusid/login/verify_request", async (req, res, next) => {
-    const { request, capability } = req.body;
+    const { chainTicker, request, capability } = req.body;
     const loginConsentCaller =
       req.api_header != null &&
       req.api_header.builtin === true &&
@@ -46,7 +45,7 @@ module.exports = (api) => {
       }
 
       const verification =
-        await api.native.verusid.login.verify_request(request);
+        await api.native.verusid.login.verify_request(chainTicker, request);
       if (verificationClaim != null && verification.verified === true) {
         verificationClaim.confirm();
       }

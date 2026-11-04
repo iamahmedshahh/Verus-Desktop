@@ -15,6 +15,7 @@ const KNOWN_SCOPES = new Set(Object.values(AUTHORIZATION_SCOPES));
 const DEFAULT_MIN_PROMPT_INTERVAL_MS = 750;
 const DEFAULT_MAX_PROMPTS_PER_WINDOW = 20;
 const DEFAULT_PROMPT_WINDOW_MS = 60 * 1000;
+const DEFAULT_FOCUS_RETURN_TIMEOUT_MS = 1000;
 
 const fixedError = (code, message) => ({ status: "error", code, message });
 
@@ -36,6 +37,29 @@ const isInteractiveWindow = (window) =>
   isAvailableWindow(window) &&
   (typeof window.isVisible !== "function" || window.isVisible()) &&
   (typeof window.isFocused !== "function" || window.isFocused());
+
+// A closing modal dialog hands focus back to its parent a few milliseconds after
+// showMessageBox resolves (2-6 ms measured on Linux/X11), so give it a moment
+// before checking the parent again. If focus never returns, the check still fails.
+const waitForFocusReturn = (window, timeoutMs) => new Promise((resolve) => {
+  if (
+    !isAvailableWindow(window) ||
+    typeof window.isFocused !== "function" ||
+    window.isFocused() ||
+    typeof window.once !== "function"
+  ) {
+    resolve();
+    return;
+  }
+  let timer = null;
+  const finish = () => {
+    clearTimeout(timer);
+    if (typeof window.removeListener === "function") window.removeListener("focus", finish);
+    resolve();
+  };
+  timer = setTimeout(finish, timeoutMs);
+  window.once("focus", finish);
+});
 
 const snapshotText = (value, field, maxLength) => {
   if (
@@ -101,6 +125,7 @@ const createNativeAuthorizationService = (dependencies = {}) => {
     minPromptIntervalMs = DEFAULT_MIN_PROMPT_INTERVAL_MS,
     maxPromptsPerWindow = DEFAULT_MAX_PROMPTS_PER_WINDOW,
     promptWindowMs = DEFAULT_PROMPT_WINDOW_MS,
+    focusReturnTimeoutMs = DEFAULT_FOCUS_RETURN_TIMEOUT_MS,
   } = dependencies;
 
   if (dialog == null || typeof dialog.showMessageBox !== "function") {
@@ -118,6 +143,9 @@ const createNativeAuthorizationService = (dependencies = {}) => {
     !Number.isFinite(promptWindowMs) || promptWindowMs <= 0
   ) {
     throw new TypeError("Invalid native authorization rate limits");
+  }
+  if (!Number.isFinite(focusReturnTimeoutMs) || focusReturnTimeoutMs < 0) {
+    throw new TypeError("Invalid native authorization focus return timeout");
   }
 
   let promptActive = false;
@@ -226,6 +254,7 @@ const createNativeAuthorizationService = (dependencies = {}) => {
         auditSafe({ operationId, scope: request.scope, actionId: request.actionId, outcome: "cancelled" });
         return { status: "cancelled" };
       }
+      await waitForFocusReturn(parentWindow, focusReturnTimeoutMs);
       if (getParentWindow(request) !== parentWindow || !isInteractiveWindow(parentWindow)) {
         auditSafe({ operationId, scope: request.scope, actionId: request.actionId, outcome: "window-lost" });
         return fixedError(
