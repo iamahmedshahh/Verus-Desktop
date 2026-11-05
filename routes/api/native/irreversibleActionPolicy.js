@@ -41,6 +41,10 @@ const IRREVERSIBLE_ROUTE_SPECS = Object.freeze({
   "/native/sendcurrency": spec("Send, convert, mint, or export currency", [
     "chainTicker", "from", "outputs", "feeamount",
   ], { detailFormat: "sendcurrency" }),
+  // The link and password are left out on purpose: the link is the card's key.
+  "/native/verusid/giftcard/fund_spendable_key": spec("Fund a gift card", [
+    "chainTicker", "address", "funds", "identities",
+  ]),
   "/electrum/sendtx": spec("Sign and broadcast a Lite-wallet transaction", [
     "chainTicker", "customFromAddress", "toAddress", "amount", "lumpFee", "feePerByte",
     "verify", "noSigature", "offlineTx", "unsigned", "customUtxos", "votingTx",
