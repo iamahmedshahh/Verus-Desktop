@@ -18,7 +18,7 @@
     "dist:all": "./scripts/create-build.sh",
     "dist-win:all": "./scripts/create-build-win.sh",
     "test": "mocha",
-    "test:security": "node --test --require ./test/registerTypeScript.js test/security.spec.js test/terminalRpcSecurity.spec.js test/terminalRpcApproval.spec.js test/terminalRpcRoute.spec.js test/sensitiveDataApproval.spec.js test/loginConsentSecurity.spec.js test/bridgekeeperSecurity.spec.js test/dependencyCompatibility.spec.js test/downloadProgress.spec.js test/releaseBuildIntegrity.spec.js test/electrumPreflightSecurity.spec.js test/electrumServerAuthorization.spec.js test/runtimeHardening.spec.js test/csp.spec.js test/nativeAuthorization.spec.js test/nativeIdentitySecurity.spec.js test/irreversibleActionPolicy.spec.js test/protectedActionExecution.spec.js",
+    "test:security": "node --test --require ./test/registerTypeScript.js test/security.spec.js test/terminalRpcSecurity.spec.js test/terminalRpcApproval.spec.js test/terminalRpcRoute.spec.js test/sensitiveDataApproval.spec.js test/loginConsentSecurity.spec.js test/genericResponseEncryption.spec.js test/appEncryptionKeys.spec.js test/bridgekeeperSecurity.spec.js test/dependencyCompatibility.spec.js test/downloadProgress.spec.js test/releaseBuildIntegrity.spec.js test/electrumPreflightSecurity.spec.js test/electrumServerAuthorization.spec.js test/runtimeHardening.spec.js test/csp.spec.js test/nativeAuthorization.spec.js test/nativeIdentitySecurity.spec.js test/irreversibleActionPolicy.spec.js test/protectedActionExecution.spec.js",
     "update-agamalib": "rm -rf node_modules/agama-wallet-lib/ && pnpm install --frozen-lockfile",
     "postinstall": "node scripts/applyBridgekeeperSecurityPatch.js"
   },
@@ -84,11 +84,11 @@
     "systeminformation": "5.31.7",
     "tx-builder": "0.18.0",
     "unzipper": "0.10.11",
-    "verus-typescript-primitives": "git+https://github.com/VerusCoin/verus-typescript-primitives.git",
+    "verus-typescript-primitives": "git+https://github.com/VerusCoin/verus-typescript-primitives.git#d5e3068021cfa83e3aae489403f4d63aad0c1a6c",
     "verus-wallet-endpoints": "git+https://github.com/VerusCoin/verus-wallet-endpoints.git",
     "verus_bridgekeeper": "git+https://github.com/VerusCoin/verusbridgekeeper.git#9084dc3f4fb3263040e808177c92ca70ea63de3a",
-    "verusd-rpc-ts-client": "git+https://github.com/VerusCoin/verusd-rpc-ts-client.git",
-    "verusid-ts-client": "git+https://github.com/VerusCoin/verusid-ts-client.git#933e8f8da1a51b99ba7533701dddb9914b7a06b7",
+    "verusd-rpc-ts-client": "git+https://github.com/VerusCoin/verusd-rpc-ts-client.git#f3dcd552d6940422e875f8f657ee3d8e2097b37b",
+    "verusid-ts-client": "git+https://github.com/VerusCoin/verusid-ts-client.git#5d81403323c8aa9d091f895100c4b9998a295e8f",
     "wif": "2.0.6"
   },
   "devDependencies": {

@@ -56,6 +56,6 @@ overrides:
 # pnpm's npm-pack of the git dep drops it. @bitgo/utxo-lib requires it at load
 # (optccparams.js), so we restore it via patch.
 patchedDependencies:
-  'bitcoin-ops@1.4.1': patches/bitcoin-ops.patch
+  'bitcoin-ops@1.4.1': ./scripts/patches/bitcoin-ops.patch
 trustPolicy: no-downgrade
 trustPolicyIgnoreAfter: 10080 # 7 days

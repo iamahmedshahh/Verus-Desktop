@@ -42,7 +42,7 @@ const normalizeTicker = (value) =>
 
 const nativeChainFromPayload = (route, payload) => {
   if (route === "/native/verusid/login/sign_response") {
-    return normalizeTicker(payload && payload.response && payload.response.chainTicker);
+    return normalizeTicker(payload && payload.chainTicker);
   }
   return normalizeTicker(payload && (
     payload.chainTicker || payload.chain || payload.coin

@@ -4,9 +4,11 @@ import axios from 'axios';
 import base64url from 'base64url';
 import {BrowserWindow, shell} from 'electron';
 import {
+  AppEncryptionResponseOrdinalVDXFObject,
   GENERIC_REQUEST_DEEPLINK_VDXF_KEY,
   GENERIC_RESPONSE_DEEPLINK_VDXF_KEY,
   GenericRequest,
+  GenericResponse,
   LOGIN_CONSENT_ID_PROVISIONING_WEBHOOK_VDXF_KEY,
   LOGIN_CONSENT_REDIRECT_VDXF_KEY,
   LOGIN_CONSENT_REQUEST_VDXF_KEY,
@@ -85,7 +87,12 @@ interface Deeplink {
 
 type DeeplinkSnapshot =
   | {version: 'v1'; fingerprint: string; redirects: readonly RequestRedirect[]}
-  | {version: 'v2'; fingerprint: string; responseUris: readonly ResponseURIJson[]};
+  | {
+      version: 'v2';
+      fingerprint: string;
+      responseUris: readonly ResponseURIJson[];
+      requiresEncryptedDetails: boolean;
+    };
 
 // Where a request's provisioning goes, and the challenge ID its provisioning request must carry.
 interface ProvisioningTarget {
@@ -154,6 +161,30 @@ const bindResponseUrisToRequest = (
 
     return match;
   });
+};
+
+// Like Verus Mobile (responseDeliverySecurity.js): app keys never leave unencrypted, and the reply to
+// a request that named encryptResponseToAddress only leaves with its details encrypted.
+const assertGenericResponseCanLeave = (hex: unknown, requiresEncryptedDetails: boolean): void => {
+  if (typeof hex !== 'string') {
+    throw new Error('Generic response must be a hex string');
+  }
+
+  const buffer = Buffer.from(hex, 'hex');
+  const response = new GenericResponse();
+  if (response.fromBuffer(buffer) !== buffer.length) {
+    throw new Error('Generic response is invalid');
+  }
+
+  if (response.details.some(detail => detail instanceof AppEncryptionResponseOrdinalVDXFObject)) {
+    throw new Error('Refusing to deliver an unencrypted app encryption response');
+  }
+
+  if (requiresEncryptedDetails && !response.detailsAreEncrypted()) {
+    throw new Error(
+      'Refusing to deliver an unencrypted response to a request that asked for encryption'
+    );
+  }
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -785,6 +816,7 @@ export = (api: any, dependencies: LoginConsentUiDependencies = {}) => {
         version: 'v2',
         fingerprint: genericRequestFingerprint(request),
         responseUris: snapshotResponseUris(request),
+        requiresEncryptedDetails: request.hasEncryptResponseToAddress(),
       });
     }
 
@@ -929,10 +961,9 @@ export = (api: any, dependencies: LoginConsentUiDependencies = {}) => {
                 if (snapshot.version !== 'v2') {
                   throw new Error('Login consent result does not match the original request');
                 }
-                await api.loginConsentUi.respond(
-                  data.response,
-                  bindResponseUrisToRequest(data.uris, snapshot.responseUris)
-                );
+                const uris = bindResponseUrisToRequest(data.uris, snapshot.responseUris);
+                assertGenericResponseCanLeave(data.response, snapshot.requiresEncryptedDetails);
+                await api.loginConsentUi.respond(data.response, uris);
               } else if (data.type === 'v1') {
                 if (snapshot.version !== 'v1') {
                   throw new Error('Login consent result does not match the original request');

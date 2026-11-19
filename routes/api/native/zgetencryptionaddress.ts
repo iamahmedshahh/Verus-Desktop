@@ -38,7 +38,8 @@ export default (api: any) => {
     coin: string,
     args: ZGetEncryptionAddressArgs
   ): Promise<ZGetEncryptionAddressResult> => {
-    return api.native.callDaemon(coin, 'z_getencryptionaddress', [args]);
+    // The arguments and the result hold keys, so keep both out of the logs.
+    return api.native.callDaemon(coin, 'z_getencryptionaddress', [args], {redactLogs: true});
   };
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
