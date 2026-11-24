@@ -14,11 +14,14 @@ module.exports = (api: any) => {
       throw new Error('IdentityUpdateRequest does not contain an identity.');
     }
 
+    // Find the identity by its address like Verus Mobile, since a sub-ID can have the same name
+    // as another identity. Generic requests only run on VRSC or VRSCTEST.
+    const address = detail.getIdentityAddress(coin === 'VRSCTEST');
+
     // Change the identity name in the detail to include `@` at the end so that it is valid
-    // for the getidentity and updateidentity daemon calls.
+    // for the updateidentity daemon call.
     detail.identity.name = detail.identity.name + '@';
-    const address = detail.identity.name;
-    const identity = await api.native.get_identity(coin, detail.identity.name);
+    const identity = await api.native.get_identity(coin, address);
 
     if (!identity) {
       throw new Error(`No identity found for ${address}.`);
